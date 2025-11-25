@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -24,11 +25,10 @@
       // Use presigned S3 URL directly
       player.src = presigned;
     } else if (filename) {
-      const videoUrl = `https://${BUCKET_NAME}.s3.amazonaws.com/${PREFIX}${filename}`;
+      const videoUrl = `https://s3.amazonaws.com/${BUCKET_NAME}/${PREFIX}${filename}`;
       player.src = videoUrl;
     } else {
       console.error("No 'file' or 'url' query parameter provided.");
-    }
     }
 
     startBtn.addEventListener("click", async () => {
@@ -79,7 +79,7 @@
       player.src = presigned;
     }
   } else if (filename) {
-    const videoUrl = `https://${BUCKET_NAME}.s3.amazonaws.com/${PREFIX}${filename}`;
+    const videoUrl = `https://s3.amazonaws.com/${BUCKET_NAME}/${PREFIX}${filename}`;
     if (!enableHLSIfNeeded(videoUrl)) {
       player.src = videoUrl;
     }
@@ -88,3 +88,4 @@
 </script>
 </body>
 </html>
+
