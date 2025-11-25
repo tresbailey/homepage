@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S3 Video Autoplayer</title>
+</head>
+<body>
+  <div id="loading" style="display:none; position:fixed; inset:0; background:black; color:white; font-size:2rem; display:flex; justify-content:center; align-items:center;">Loading…</div>
+  <div id="rotatePrompt" style="display:none; position:fixed; inset:0; background:black; color:white; font-size:1.5rem; display:flex; justify-content:center; align-items:center; text-align:center; padding:20px;">Please rotate your device to landscape.</div>
+
+  <button id="startBtn" style="font-size:1.5rem; padding:1rem 2rem;">Start Video</button>
+  <video id="player" controls style="display:none; width:100%; max-width:800px;"></video>
+
+  <script>
+    const BUCKET_NAME = "tresback.com";
+    const PREFIX = "videos/turkey-24/";
+
+    const params = new URLSearchParams(window.location.search);
+    const filename = params.get("file");
+    const presigned = params.get("url"); // optional presigned URL
+
+    if (presigned) {
+      // Use presigned S3 URL directly
+      player.src = presigned;
+    } else if (filename) {
+      const videoUrl = `https://${BUCKET_NAME}.s3.amazonaws.com/${PREFIX}${filename}`;
+      player.src = videoUrl;
+    } else {
+      console.error("No 'file' or 'url' query parameter provided.");
+    }
+    }
+
+    startBtn.addEventListener("click", async () => {
+      startBtn.style.display = "none";
+      loading.style.display = "flex";
+
+      player.style.display = "block";
+      try {
+        await player.play();
+      } catch (e) {
+        console.warn("Playback error:", e);
+      }
+
+      loading.style.display = "none";
+      checkOrientation();
+
+      try {
+        if (player.requestFullscreen) {
+          await player.requestFullscreen();
+        }
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock("landscape");
+        }
+      } catch (e) {
+        console.warn("Fullscreen or orientation lock failed:", e);
+      }
+    });
+    // --- HLS Streaming Support (for .m3u8 presigned URLs or files) ---
+  function enableHLSIfNeeded(url) {
+    if (url.endsWith('.m3u8')) {
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(player);
+      } else if (player.canPlayType('application/vnd.apple.mpegurl')) {
+        player.src = url; // Safari supports HLS natively
+      } else {
+        console.error('HLS is not supported in this browser');
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // Replace direct src assignment with HLS-aware logic
+  if (presigned) {
+    if (!enableHLSIfNeeded(presigned)) {
+      player.src = presigned;
+    }
+  } else if (filename) {
+    const videoUrl = `https://${BUCKET_NAME}.s3.amazonaws.com/${PREFIX}${filename}`;
+    if (!enableHLSIfNeeded(videoUrl)) {
+      player.src = videoUrl;
+    }
+  }
+
+</script>
+</body>
+</html>
