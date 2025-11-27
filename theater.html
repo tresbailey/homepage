@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,85 +6,77 @@
   <title>S3 Video Autoplayer</title>
 </head>
 <body>
-  <div id="loading" style="display:none; position:fixed; inset:0; background:black; color:white; font-size:2rem; display:flex; justify-content:center; align-items:center;">Loading…</div>
-  <div id="rotatePrompt" style="display:none; position:fixed; inset:0; background:black; color:white; font-size:1.5rem; display:flex; justify-content:center; align-items:center; text-align:center; padding:20px;">Please rotate your device to landscape.</div>
 
   <button id="startBtn" style="font-size:1.5rem; padding:1rem 2rem;">Start Video</button>
-  <video id="player" controls style="display:none; width:100%; max-width:800px;"></video>
+  <video id="player" controls style="display:none; width:100%;"></video>
+<script>
+const BUCKET_NAME = "tresback.com";
+const PREFIX = "videos/turkey-25/";
 
-  <script>
-    const BUCKET_NAME = "tresback.com";
-    const PREFIX = "videos/turkey-24/";
+const params = new URLSearchParams(window.location.search);
+const filename = params.get("file");
+const presigned = params.get("url");
 
-    const params = new URLSearchParams(window.location.search);
-    const filename = params.get("file");
-    const presigned = params.get("url"); // optional presigned URL
+let videoUrl = null;
+let hlsInstance = null;
 
-    if (presigned) {
-      // Use presigned S3 URL directly
-      player.src = presigned;
-    } else if (filename) {
-      const videoUrl = `https://s3.amazonaws.com/${BUCKET_NAME}/${PREFIX}${filename}`;
-      player.src = videoUrl;
+// Build URL but DO NOT assign player.src yet
+if (presigned) {
+  videoUrl = presigned;
+} else if (filename) {
+  videoUrl = `https://s3.amazonaws.com/${BUCKET_NAME}/${PREFIX}${filename}`;
+} else {
+  console.error("No 'file' or 'url' provided.");
+}
+
+// HLS helper
+function loadVideo(url) {
+  if (url.endsWith(".m3u8")) {
+    if (Hls.isSupported()) {
+      hlsInstance = new Hls();
+      hlsInstance.loadSource(url);
+      hlsInstance.attachMedia(player);
+    } else if (player.canPlayType("application/vnd.apple.mpegurl")) {
+      player.src = url; // Safari
     } else {
-      console.error("No 'file' or 'url' query parameter provided.");
+      console.error("HLS not supported");
     }
-
-    startBtn.addEventListener("click", async () => {
-      startBtn.style.display = "none";
-      loading.style.display = "flex";
-
-      player.style.display = "block";
-      try {
-        await player.play();
-      } catch (e) {
-        console.warn("Playback error:", e);
-      }
-
-      loading.style.display = "none";
-      checkOrientation();
-
-      try {
-        if (player.requestFullscreen) {
-          await player.requestFullscreen();
-        }
-        if (screen.orientation && screen.orientation.lock) {
-          await screen.orientation.lock("landscape");
-        }
-      } catch (e) {
-        console.warn("Fullscreen or orientation lock failed:", e);
-      }
-    });
-    // --- HLS Streaming Support (for .m3u8 presigned URLs or files) ---
-  function enableHLSIfNeeded(url) {
-    if (url.endsWith('.m3u8')) {
-      if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(player);
-      } else if (player.canPlayType('application/vnd.apple.mpegurl')) {
-        player.src = url; // Safari supports HLS natively
-      } else {
-        console.error('HLS is not supported in this browser');
-      }
-      return true;
-    }
-    return false;
+  } else {
+    player.src = url; // MP4
   }
+}
 
-  // Replace direct src assignment with HLS-aware logic
-  if (presigned) {
-    if (!enableHLSIfNeeded(presigned)) {
-      player.src = presigned;
+startBtn.addEventListener("click", async () => {
+  startBtn.style.display = "none";
+
+  // Load video NOW (AFTER user gesture)
+  loadVideo(videoUrl);
+
+  player.style.display = "block";
+
+  // Wait a brief moment for HLS to attach before playing
+  setTimeout(async () => {
+    try {
+      await player.play();
+    } catch (err) {
+      console.warn("Playback error:", err);
     }
-  } else if (filename) {
-    const videoUrl = `https://s3.amazonaws.com/${BUCKET_NAME}/${PREFIX}${filename}`;
-    if (!enableHLSIfNeeded(videoUrl)) {
-      player.src = videoUrl;
+
+
+    // Fullscreen + orientation (best attempt)
+    try {
+      if (player.requestFullscreen) {
+        await player.requestFullscreen();
+      }
+      if (screen.orientation?.lock) {
+        await screen.orientation.lock("landscape");
+      }
+    } catch (err) {
+      console.warn("Fullscreen/orientation failed:", err);
     }
-  }
+  }, 200);
+});
 
 </script>
 </body>
 </html>
-
